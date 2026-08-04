@@ -29,16 +29,34 @@ export async function initiateSTKPush(req, res) {
       transactionDesc || "United Nations Promotional Award"
     );
 
-    // Save a pending payment immediately
-    await supabase.from("payments").insert({
-      application_id: applicationId || null,
-      user_id: userId || null,
-      merchant_request_id: response.MerchantRequestID,
-      checkout_request_id: response.CheckoutRequestID,
-      phone_number: phoneNumber,
-      amount,
-      status: "pending",
-    });
+    // Save pending payment
+    const { data, error } = await supabase
+      .from("payments")
+      .insert({
+        application_id: applicationId || null,
+        user_id: userId || null,
+        merchant_request_id: response.MerchantRequestID,
+        checkout_request_id: response.CheckoutRequestID,
+        phone_number: phoneNumber,
+        amount,
+        status: "pending",
+      })
+      .select();
+
+    if (error) {
+      console.error("========== SUPABASE INSERT ERROR ==========");
+      console.error(error);
+      console.error("===========================================");
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to save payment.",
+        error,
+      });
+    }
+
+    console.log("Payment inserted successfully.");
+    console.log(data);
 
     return res.json({
       success: true,
@@ -57,6 +75,7 @@ export async function initiateSTKPush(req, res) {
     });
   }
 }
+
 /**
  * M-Pesa Callback
  */
@@ -66,8 +85,7 @@ export async function mpesaCallback(req, res) {
     console.log(JSON.stringify(req.body, null, 2));
     console.log("=====================================");
 
-    const callback =
-      req.body.Body?.stkCallback;
+    const callback = req.body.Body?.stkCallback;
 
     if (!callback) {
       return res.json({
@@ -80,9 +98,9 @@ export async function mpesaCallback(req, res) {
     const resultCode = callback.ResultCode;
     const resultDesc = callback.ResultDesc;
 
-    // Payment Failed
+    // Payment failed
     if (resultCode !== 0) {
-      await supabase
+      const { error } = await supabase
         .from("payments")
         .update({
           result_code: resultCode,
@@ -92,20 +110,20 @@ export async function mpesaCallback(req, res) {
         })
         .eq("checkout_request_id", checkoutRequestId);
 
+      if (error) {
+        console.error("UPDATE FAILED:", error);
+      }
+
       return res.json({
         ResultCode: 0,
         ResultDesc: "Accepted",
       });
     }
 
-    const callbackItems =
-      callback.CallbackMetadata?.Item || [];
+    const callbackItems = callback.CallbackMetadata?.Item || [];
 
     const getValue = (name) => {
-      const item = callbackItems.find(
-        (i) => i.Name === name
-      );
-
+      const item = callbackItems.find((i) => i.Name === name);
       return item ? item.Value : null;
     };
 
@@ -114,7 +132,6 @@ export async function mpesaCallback(req, res) {
     const transactionDate = getValue("TransactionDate");
     const phoneNumber = getValue("PhoneNumber");
 
-    // Update payment record
     const { data: payment, error } = await supabase
       .from("payments")
       .update({
@@ -134,18 +151,31 @@ export async function mpesaCallback(req, res) {
       .single();
 
     if (error) {
+      console.error("========== CALLBACK UPDATE ERROR ==========");
       console.error(error);
+      console.error("===========================================");
+
+      return res.json({
+        ResultCode: 0,
+        ResultDesc: "Accepted",
+      });
     }
 
-    // Mark related application as paid
+    console.log("Payment updated successfully.");
+
     if (payment?.application_id) {
-      await supabase
+      const { error: applicationError } = await supabase
         .from("applications")
         .update({
           payment_status: "paid",
           updated_at: new Date().toISOString(),
         })
         .eq("id", payment.application_id);
+
+      if (applicationError) {
+        console.error("APPLICATION UPDATE ERROR:");
+        console.error(applicationError);
+      }
     }
 
     return res.json({
@@ -153,7 +183,9 @@ export async function mpesaCallback(req, res) {
       ResultDesc: "Accepted",
     });
   } catch (error) {
-    console.error("Callback Error:", error);
+    console.error("========== CALLBACK ERROR ==========");
+    console.error(error);
+    console.error("====================================");
 
     return res.json({
       ResultCode: 0,
