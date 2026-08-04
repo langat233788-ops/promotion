@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 
 import authRoutes from "./routes/authRoutes.js";
 import mpesaRoutes from "./routes/mpesaRoutes.js";
+import applicationRoutes from "./routes/applicationRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -45,6 +46,8 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 
 app.use("/api/mpesa", mpesaRoutes);
+
+app.use("/api/applications", applicationRoutes);
 
 // =======================
 // 404 Handler
