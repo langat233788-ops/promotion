@@ -39,6 +39,7 @@ export async function initiateSTKPush(req, res) {
         checkout_request_id: response.CheckoutRequestID,
         phone_number: phoneNumber,
         amount,
+        payment_type: "mpesa",
         status: "pending",
       })
       .select();
@@ -98,7 +99,7 @@ export async function mpesaCallback(req, res) {
     const resultCode = callback.ResultCode;
     const resultDesc = callback.ResultDesc;
 
-    // Payment failed
+    // Payment Failed
     if (resultCode !== 0) {
       const { error } = await supabase
         .from("payments")
