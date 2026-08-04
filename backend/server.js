@@ -3,8 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import authRoutes from "./routes/authRoutes.js";
-import mpesaRoutes from "./routes/mpesaRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
 import applicationRoutes from "./routes/applicationRoutes.js";
+import mpesaRoutes from "./routes/mpesaRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -45,9 +46,11 @@ app.get("/", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 
-app.use("/api/mpesa", mpesaRoutes);
+app.use("/api/profiles", profileRoutes);
 
 app.use("/api/applications", applicationRoutes);
+
+app.use("/api/mpesa", mpesaRoutes);
 
 // =======================
 // 404 Handler
