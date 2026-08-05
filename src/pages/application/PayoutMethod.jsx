@@ -14,18 +14,15 @@ import {
 
 function PayoutMethod() {
   const navigate = useNavigate();
-
   const { applicationId } = useParams();
 
   const { saveCurrentStep } = useApplication();
 
   const [loading, setLoading] = useState(false);
 
-  const [promotionAmount, setPromotionAmount] =
-    useState(0);
+  const [promotionAmount, setPromotionAmount] = useState(0);
 
-  const [selectedMethod, setSelectedMethod] =
-    useState("");
+  const [selectedMethod, setSelectedMethod] = useState("");
 
   const [fees, setFees] = useState({
     mpesa: 0,
@@ -36,25 +33,20 @@ function PayoutMethod() {
   useEffect(() => {
     async function loadApplication() {
       try {
-        const application =
-          await getApplicationById(applicationId);
+        const application = await getApplicationById(applicationId);
 
-        const amount = Number(
-          application.promotion_amount || 0
-        );
+        const amount = Number(application.promotion_amount || 0);
 
         setPromotionAmount(amount);
 
         setFees({
           mpesa: amount * 0.15,
           airtel: amount * 0.175,
-          bank: amount * 0.20,
+          bank: amount * 0.2,
         });
 
         if (application.payout_method) {
-          setSelectedMethod(
-            application.payout_method
-          );
+          setSelectedMethod(application.payout_method);
         }
       } catch (error) {
         console.error(error);
@@ -100,11 +92,10 @@ function PayoutMethod() {
         payout_fee: fee,
       });
 
-      await saveCurrentStep(applicationId, 6);
+      // Move to Payout Details
+      await saveCurrentStep(applicationId, 7);
 
-      navigate(
-        `/apply/${applicationId}/payout-details`
-      );
+      navigate(`/apply/${applicationId}/payout-details`);
     } catch (error) {
       console.error(error);
       alert("Failed to save payout method.");
@@ -114,15 +105,15 @@ function PayoutMethod() {
   }
 
   function previousPage() {
-    navigate(`/apply/${applicationId}/step4`);
+    navigate(`/apply/${applicationId}/step5`);
   }
     return (
     <FormCard>
       <StepHeader
-        title="Step 5 - Choose Payout Method"
+        title="Step 6 - Choose Payout Method"
         description="Select how you would like to receive your promotion funds."
-        step={5}
-        totalSteps={10}
+        step={6}
+        totalSteps={12}
       />
 
       <form
@@ -262,9 +253,9 @@ function PayoutMethod() {
           </h3>
 
           <p className="text-sm text-gray-700">
-            The transaction fee will be paid after you provide
-            your payout details. This fee is <strong>fully refundable</strong>
-            if your application is not processed.
+            The transaction fee will be paid after you provide your payout
+            details. This fee is <strong>fully refundable</strong> if your
+            application is not processed.
           </p>
         </div>
 

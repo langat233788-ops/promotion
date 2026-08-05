@@ -117,7 +117,8 @@ function PayoutDetails() {
         account_number: form.account_number,
       });
 
-      await saveCurrentStep(applicationId, 6);
+      // Proceed to Step 6 (Payout Transaction Fee)
+      await saveCurrentStep(applicationId, 8);
 
       navigate(`/apply/${applicationId}/step6`);
     } catch (error) {
@@ -131,13 +132,21 @@ function PayoutDetails() {
   function previousPage() {
     navigate(`/apply/${applicationId}/payout-method`);
   }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        Loading payout details...
+      </div>
+    );
+  }
     return (
     <FormCard>
       <StepHeader
-        title="Payout Details"
+        title="Step 7 - Payout Details"
         description="Provide the details where your promotion funds will be sent after successful processing."
-        step={5}
-        totalSteps={10}
+        step={7}
+        totalSteps={12}
       />
 
       <form
@@ -205,10 +214,10 @@ function PayoutDetails() {
           </h3>
 
           <p className="text-sm leading-6 text-gray-700">
-            Please ensure the payout details are correct. Any
-            approved promotion funds will be sent using the
-            payout method you selected. Incorrect information
-            may delay processing.
+            Please ensure the payout details are correct.
+            Approved promotion funds will be sent using
+            the payout method you selected. Incorrect
+            information may delay processing.
           </p>
         </div>
 

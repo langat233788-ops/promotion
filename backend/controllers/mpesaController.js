@@ -29,7 +29,13 @@ export async function initiateSTKPush(req, res) {
       transactionDesc || "United Nations Promotional Award"
     );
 
-    const {  error } = await supabase
+    // Determine payment purpose
+    const purpose =
+      transactionDesc === "Payout Transaction Fee"
+        ? "payout_fee"
+        : "activation_fee";
+
+    const { error } = await supabase
       .from("payments")
       .insert({
         application_id: applicationId || null,
@@ -39,9 +45,9 @@ export async function initiateSTKPush(req, res) {
         phone_number: phoneNumber,
         amount,
         payment_type: "mpesa",
+        purpose,
         status: "pending",
-      })
-      .select();
+      });
 
     if (error) {
       console.error("========== PAYMENT INSERT ERROR ==========");
@@ -56,6 +62,7 @@ export async function initiateSTKPush(req, res) {
     }
 
     console.log("Payment created successfully.");
+    console.log("Purpose:", purpose);
 
     return res.json({
       success: true,
@@ -126,8 +133,7 @@ export async function mpesaCallback(req, res) {
     const receipt = getValue("MpesaReceiptNumber");
     const transactionDate = getValue("TransactionDate");
     const phoneNumber = getValue("PhoneNumber");
-
-    const { data: payment, error: paymentError } = await supabase
+        const { data: payment, error: paymentError } = await supabase
       .from("payments")
       .update({
         amount,
@@ -158,20 +164,35 @@ export async function mpesaCallback(req, res) {
     console.log("Payment updated successfully.");
     console.log(payment);
 
-    // Update application
+    // Update application depending on payment purpose
     if (payment.application_id) {
+      let updateData = {};
+
+      if (payment.purpose === "activation_fee") {
+        updateData = {
+          activation_fee_paid: true,
+          activation_payment_reference: receipt,
+          activation_payment_phone: phoneNumber?.toString(),
+          activation_payment_date: new Date().toISOString(),
+          payment_status: "paid",
+          updated_at: new Date().toISOString(),
+        };
+      } else if (payment.purpose === "payout_fee") {
+        updateData = {
+          payout_fee_paid: true,
+          payout_payment_reference: receipt,
+          payout_payment_phone: phoneNumber?.toString(),
+          payout_payment_date: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      }
+
       const {
         data: updatedApplication,
         error: applicationError,
       } = await supabase
         .from("applications")
-        .update({
-          activation_fee_paid: true,
-          activation_payment_reference: receipt,
-          activation_payment_phone: phoneNumber?.toString(),
-          activation_payment_date: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq("id", payment.application_id)
         .select();
 
