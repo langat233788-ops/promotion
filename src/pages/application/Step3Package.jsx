@@ -22,7 +22,7 @@ function Step3Package() {
 
   const [form, setForm] = useState({
     promotion_amount: "",
-    activation_fee: 0,
+    activation_fee: 1, // Development fee
   });
 
   useEffect(() => {
@@ -36,7 +36,7 @@ function Step3Package() {
 
         setForm({
           promotion_amount: amount,
-          activation_fee: amount * 0.1,
+          activation_fee: 1, // Always KES 1 during development
         });
       } catch (error) {
         console.error(error);
@@ -52,11 +52,11 @@ function Step3Package() {
   }, [applicationId]);
 
   function handleChange(e) {
-    const value = e.target.value;
+    const value = Number(e.target.value);
 
     setForm({
       promotion_amount: value,
-      activation_fee: value ? Number(value) * 0.1 : 0,
+      activation_fee: 1, // Keep fixed for testing
     });
   }
 
@@ -89,10 +89,11 @@ function Step3Package() {
 
       await saveStep3(applicationId, {
         promotion_amount: Number(form.promotion_amount),
-        activation_fee: Number(form.activation_fee),
+        activation_fee: 1,
       });
 
-      await saveCurrentStep(applicationId, 4);
+      // Step 3 completed, continue to Step 4
+      await saveCurrentStep(applicationId, 5);
 
       navigate(`/apply/${applicationId}/step4`);
     } catch (error) {
@@ -106,19 +107,17 @@ function Step3Package() {
   function previousPage() {
     navigate(`/apply/${applicationId}/step3-notice`);
   }
-    return (
+
+  return (
     <FormCard>
       <StepHeader
         title="Step 3 - Select Promotion Package"
-        description="Choose your preferred promotion amount. The activation fee is calculated automatically."
+        description="Choose your preferred promotion amount."
         step={3}
         totalSteps={10}
       />
 
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-8"
-      >
+      <form onSubmit={handleSubmit} className="space-y-8">
         <div>
           <label className="mb-2 block font-semibold">
             Promotion Amount (KES)
@@ -148,21 +147,17 @@ function Step3Package() {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span>Promotion Amount</span>
+
               <span className="font-semibold">
-                KES{" "}
-                {Number(
-                  form.promotion_amount || 0
-                ).toLocaleString()}
+                KES {Number(form.promotion_amount).toLocaleString()}
               </span>
             </div>
 
             <div className="flex justify-between">
-              <span>Activation Fee (10%)</span>
+              <span>Activation Fee (Development)</span>
+
               <span className="font-semibold text-red-600">
-                KES{" "}
-                {Number(
-                  form.activation_fee || 0
-                ).toLocaleString()}
+                KES 1
               </span>
             </div>
 
@@ -170,11 +165,9 @@ function Step3Package() {
 
             <div className="flex justify-between text-lg font-bold">
               <span>Total Payable Now</span>
+
               <span className="text-green-700">
-                KES{" "}
-                {Number(
-                  form.activation_fee || 0
-                ).toLocaleString()}
+                KES 1
               </span>
             </div>
           </div>

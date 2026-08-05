@@ -11,7 +11,6 @@ import StepHeader from "../../components/application/StepHeader";
 import StepButtons from "../../components/application/StepButtons";
 
 import { useAuth } from "../../features/auth/AuthContext";
-import { useApplication } from "../../features/application/ApplicationContext";
 
 import {
   getApplicationById,
@@ -24,8 +23,6 @@ function Step1() {
   const { applicationId } = useParams();
 
   const { user } = useAuth();
-
-  const { saveCurrentStep } = useApplication();
 
   const [loading, setLoading] = useState(false);
 
@@ -139,8 +136,6 @@ function Step1() {
 
       await saveStep1(applicationId, form);
 
-      await saveCurrentStep(applicationId, 2);
-
       navigate(`/apply/${applicationId}/step2`);
     } catch (error) {
       console.error(error);
@@ -168,7 +163,7 @@ function Step1() {
         className="space-y-6"
       >
         <div className="grid gap-6 md:grid-cols-2">
-                      <FormInput
+          <FormInput
             label="First Name"
             name="first_name"
             value={form.first_name}
@@ -273,7 +268,6 @@ function Step1() {
             onChange={handleChange}
             required
           />
-
         </div>
 
         <FormInput
@@ -291,7 +285,6 @@ function Step1() {
           nextText={loading ? "Saving..." : "Save & Continue"}
           loading={loading}
         />
-
       </form>
     </FormCard>
   );

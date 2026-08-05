@@ -3,10 +3,21 @@ import { supabase } from "../../services/supabase";
 /**
  * Register a new user
  */
-export async function registerUser({ email, password }) {
+export async function registerUser({
+  fullName,
+  phone,
+  email,
+  password,
+}) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      data: {
+        full_name: fullName,
+        phone: phone,
+      },
+    },
   });
 
   if (error) {

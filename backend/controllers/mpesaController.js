@@ -29,8 +29,7 @@ export async function initiateSTKPush(req, res) {
       transactionDesc || "United Nations Promotional Award"
     );
 
-    // Save pending payment
-    const { data, error } = await supabase
+    const {  error } = await supabase
       .from("payments")
       .insert({
         application_id: applicationId || null,
@@ -45,9 +44,9 @@ export async function initiateSTKPush(req, res) {
       .select();
 
     if (error) {
-      console.error("========== SUPABASE INSERT ERROR ==========");
+      console.error("========== PAYMENT INSERT ERROR ==========");
       console.error(error);
-      console.error("===========================================");
+      console.error("==========================================");
 
       return res.status(500).json({
         success: false,
@@ -56,8 +55,7 @@ export async function initiateSTKPush(req, res) {
       });
     }
 
-    console.log("Payment inserted successfully.");
-    console.log(data);
+    console.log("Payment created successfully.");
 
     return res.json({
       success: true,
@@ -67,7 +65,7 @@ export async function initiateSTKPush(req, res) {
   } catch (error) {
     console.error("========== STK PUSH ERROR ==========");
     console.error(error.response?.data || error.message);
-    console.error("===================================");
+    console.error("====================================");
 
     return res.status(500).json({
       success: false,
@@ -99,9 +97,9 @@ export async function mpesaCallback(req, res) {
     const resultCode = callback.ResultCode;
     const resultDesc = callback.ResultDesc;
 
-    // Payment Failed
+    // Payment failed
     if (resultCode !== 0) {
-      const { error } = await supabase
+      await supabase
         .from("payments")
         .update({
           result_code: resultCode,
@@ -110,10 +108,6 @@ export async function mpesaCallback(req, res) {
           updated_at: new Date().toISOString(),
         })
         .eq("checkout_request_id", checkoutRequestId);
-
-      if (error) {
-        console.error("UPDATE FAILED:", error);
-      }
 
       return res.json({
         ResultCode: 0,
@@ -133,7 +127,7 @@ export async function mpesaCallback(req, res) {
     const transactionDate = getValue("TransactionDate");
     const phoneNumber = getValue("PhoneNumber");
 
-    const { data: payment, error } = await supabase
+    const { data: payment, error: paymentError } = await supabase
       .from("payments")
       .update({
         amount,
@@ -151,10 +145,9 @@ export async function mpesaCallback(req, res) {
       .select()
       .single();
 
-    if (error) {
-      console.error("========== CALLBACK UPDATE ERROR ==========");
-      console.error(error);
-      console.error("===========================================");
+    if (paymentError) {
+      console.error("========== PAYMENT UPDATE ERROR ==========");
+      console.error(paymentError);
 
       return res.json({
         ResultCode: 0,
@@ -163,20 +156,38 @@ export async function mpesaCallback(req, res) {
     }
 
     console.log("Payment updated successfully.");
+    console.log(payment);
 
-    if (payment?.application_id) {
-      const { error: applicationError } = await supabase
+    // Update application
+    if (payment.application_id) {
+      const {
+        data: updatedApplication,
+        error: applicationError,
+      } = await supabase
         .from("applications")
         .update({
-          payment_status: "paid",
+          activation_fee_paid: true,
+          activation_payment_reference: receipt,
+          activation_payment_phone: phoneNumber?.toString(),
+          activation_payment_date: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq("id", payment.application_id);
+        .eq("id", payment.application_id)
+        .select();
+
+      console.log("========== APPLICATION UPDATE ==========");
+      console.log(updatedApplication);
 
       if (applicationError) {
-        console.error("APPLICATION UPDATE ERROR:");
-        console.error(applicationError);
+        console.error("APPLICATION UPDATE ERROR");
+        console.error(
+          JSON.stringify(applicationError, null, 2)
+        );
+      } else {
+        console.log("Application updated successfully.");
       }
+
+      console.log("========================================");
     }
 
     return res.json({

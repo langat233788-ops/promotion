@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import FormCard from "../../components/application/FormCard";
@@ -6,117 +6,152 @@ import FormInput from "../../components/application/FormInput";
 import StepHeader from "../../components/application/StepHeader";
 import StepButtons from "../../components/application/StepButtons";
 
+import { useAuth } from "../../features/auth/AuthContext";
 import { useApplication } from "../../features/application/ApplicationContext";
 
 import {
   getApplicationById,
-  updateApplication,
 } from "../../features/application/applicationService";
 
 function Step4() {
   const navigate = useNavigate();
-
   const { applicationId } = useParams();
 
+  const { user } = useAuth();
   const { saveCurrentStep } = useApplication();
 
-  const [loading, setLoading] = useState(false);
-
-  const [promotionAmount, setPromotionAmount] = useState(0);
-
-  const [activationFee, setActivationFee] = useState(0);
-
+  const [application, setApplication] = useState(null);
   const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [waitingPayment, setWaitingPayment] = useState(false);
 
-  const [accepted, setAccepted] = useState(false);
+  const intervalRef = useRef(null);
+
+  async function loadApplication() {
+    try {
+      const data = await getApplicationById(applicationId);
+
+      setApplication(data);
+
+      setPhone(
+        data.activation_payment_phone ||
+          data.phone ||
+          ""
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Failed to load application.");
+    }
+  }
 
   useEffect(() => {
-    async function loadApplication() {
-      try {
-        const application =
-          await getApplicationById(applicationId);
-
-        setPromotionAmount(
-          Number(application.promotion_amount || 0)
-        );
-
-        setActivationFee(
-          Number(application.activation_fee || 0)
-        );
-
-        setPhone(
-          application.activation_payment_phone || ""
-        );
-
-        setAccepted(
-          application.activation_fee_paid || false
-        );
-      } catch (error) {
-        console.error(error);
-
-        alert("Failed to load application.");
-      }
-    }
-
     loadApplication();
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, [applicationId]);
 
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (!phone.trim()) {
-      alert("Please enter your M-Pesa number.");
+    if (!application) {
+      alert("Application not loaded.");
       return;
     }
 
-    if (!accepted) {
-      alert("Please accept the refund policy.");
+    if (!phone.trim()) {
+      alert("Please enter your M-Pesa phone number.");
       return;
     }
 
     try {
       setLoading(true);
 
-      // Temporary payment simulation
-      await new Promise((resolve) =>
-        setTimeout(resolve, 2500)
+      const response = await fetch(
+        "http://localhost:5000/api/mpesa/stkpush",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            phoneNumber: phone,
+            amount: application.activation_fee,
+            applicationId: application.id,
+            userId: user.id,
+            accountReference:
+              application.reference_no ||
+              application.id,
+            transactionDesc: "Activation Fee",
+          }),
+        }
       );
 
-      await updateApplication(applicationId, {
-        activation_fee_paid: true,
-        activation_payment_phone: phone,
-        activation_payment_reference:
-          "SIM-" + Date.now(),
-        activation_payment_date:
-          new Date().toISOString(),
-      });
+      const result = await response.json();
 
-      await saveCurrentStep(applicationId, 5);
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to send STK Push."
+        );
+      }
 
-      alert("Activation fee paid successfully.");
-
-      navigate(
-        `/apply/${applicationId}/payout-method`
+      alert(
+        "STK Push sent successfully. Check your phone and enter your M-Pesa PIN."
       );
+
+      setWaitingPayment(true);
+
+      intervalRef.current = setInterval(async () => {
+        try {
+          const latest = await getApplicationById(
+            applicationId
+          );
+
+          if (latest.activation_fee_paid) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+
+            await saveCurrentStep(applicationId, 5);
+
+            navigate(`/apply/${applicationId}/step5`);
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }, 3000);
     } catch (error) {
       console.error(error);
-
-      alert("Payment failed.");
+      alert(error.message);
     } finally {
       setLoading(false);
     }
   }
 
   function previousPage() {
-    navigate(
-      `/apply/${applicationId}/step3-package`
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    navigate(`/apply/${applicationId}/step3-package`);
+  }
+
+  if (!application) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        Loading application...
+      </div>
     );
   }
-    return (
+
+  return (
     <FormCard>
       <StepHeader
         title="Step 4 - Activation Fee Payment"
-        description="Pay the activation fee to continue with your application."
+        description="Pay your activation fee through M-Pesa to continue."
         step={4}
         totalSteps={10}
       />
@@ -125,89 +160,72 @@ function Step4() {
         onSubmit={handleSubmit}
         className="space-y-8"
       >
-        {/* Payment Summary */}
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-5 text-xl font-bold">
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6">
+          <h2 className="mb-5 text-xl font-bold text-blue-700">
             Payment Summary
           </h2>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">
-                Promotion Amount
-              </span>
+            <div className="flex justify-between">
+              <span>Promotion Amount</span>
 
-              <span className="font-bold">
-                KES {promotionAmount.toLocaleString()}
-              </span>
+              <strong>
+                KES{" "}
+                {Number(
+                  application.promotion_amount
+                ).toLocaleString()}
+              </strong>
             </div>
 
-            <div className="flex items-center justify-between border-t pt-4">
-              <span className="font-semibold">
-                Activation Fee (10%)
-              </span>
+            <div className="flex justify-between border-t pt-4">
+              <span>Activation Fee (10%)</span>
 
-              <span className="text-2xl font-bold text-blue-700">
-                KES {activationFee.toLocaleString()}
-              </span>
+              <strong className="text-red-600">
+                KES{" "}
+                {Number(
+                  application.activation_fee
+                ).toLocaleString()}
+              </strong>
             </div>
           </div>
         </div>
 
-        {/* Refund Notice */}
-
-        <div className="rounded-2xl border-l-4 border-yellow-500 bg-yellow-50 p-6">
-          <h3 className="mb-3 text-lg font-bold text-yellow-700">
-            Refund Policy
+        <div className="rounded-xl border-l-4 border-yellow-500 bg-yellow-50 p-6">
+          <h3 className="mb-2 text-lg font-bold text-yellow-700">
+            Payment Instructions
           </h3>
 
           <p className="leading-7 text-gray-700">
-            The activation fee is required before your application
-            can proceed. This fee is <strong>fully refundable</strong>
-            if your application is not processed.
+            Enter the M-Pesa number that will receive the STK Push.
+            After clicking <strong>Pay Now</strong>,
+            check your phone and enter your M-Pesa PIN.
           </p>
         </div>
-
-        {/* Payment Method */}
-
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-6">
-          <h3 className="mb-2 text-lg font-bold text-green-700">
-            Payment Method
-          </h3>
-
-          <p className="text-gray-700">
-            Payment will be made through <strong>M-Pesa</strong>.
-            Enter the phone number that will receive the STK Push.
-          </p>
-        </div>
-
-        {/* Phone Number */}
 
         <FormInput
-          label="M-Pesa Number"
+          label="M-Pesa Phone Number"
           name="phone"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          placeholder="07XXXXXXXX"
+          placeholder="2547XXXXXXXX"
           required
         />
+                {waitingPayment && (
+          <div className="rounded-xl border border-green-300 bg-green-50 p-6 text-center">
+            <h3 className="text-xl font-bold text-green-700">
+              Waiting for Payment Confirmation...
+            </h3>
 
-        {/* Agreement */}
-
-        <label className="flex items-start gap-3 rounded-xl border bg-gray-50 p-4">
-          <input
-            type="checkbox"
-            checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
-            className="mt-1 h-5 w-5"
-          />
-
-          <span className="text-gray-700">
-            I understand that the activation fee is fully refundable
-            if my application is not processed.
-          </span>
-        </label>
+            <p className="mt-3 leading-7 text-gray-700">
+              An STK Push has been sent to your phone.
+              <br />
+              Please enter your M-Pesa PIN to complete the payment.
+              <br />
+              This page will continue automatically once payment has
+              been confirmed.
+            </p>
+          </div>
+        )}
 
         <StepButtons
           onPrevious={previousPage}
@@ -215,8 +233,10 @@ function Step4() {
           previousText="Back"
           nextText={
             loading
-              ? "Processing Payment..."
-              : `Pay KES ${activationFee.toLocaleString()}`
+              ? "Sending STK Push..."
+              : `Pay KES ${Number(
+                  application.activation_fee
+                ).toLocaleString()}`
           }
           loading={loading}
         />

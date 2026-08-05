@@ -15,15 +15,10 @@ import {
   saveStep2,
 } from "../../features/application/applicationService";
 
-import { useApplication } from "../../features/application/ApplicationContext";
-
 function Step2() {
-    
   const navigate = useNavigate();
 
   const { applicationId } = useParams();
-
-  const { saveCurrentStep } = useApplication();
 
   const [loading, setLoading] = useState(false);
 
@@ -91,31 +86,29 @@ function Step2() {
     return null;
   }
 
-async function handleSubmit(e) {
-  e.preventDefault();
+  async function handleSubmit(e) {
+    e.preventDefault();
 
-  const validationError = validateForm();
+    const validationError = validateForm();
 
-  if (validationError) {
-    alert(validationError);
-    return;
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await saveStep2(applicationId, form);
+
+      navigate(`/apply/${applicationId}/step3-notice`);
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
   }
-
-  try {
-    setLoading(true);
-
-    await saveStep2(applicationId, form);
-
-    await saveCurrentStep(applicationId, 3);
-
-    navigate(`/apply/${applicationId}/step3-notice`);
-  } catch (error) {
-    console.error(error);
-    alert(error.message);
-  } finally {
-    setLoading(false);
-  }
-}
 
   function previousPage() {
     navigate(`/apply/${applicationId}/step1`);
@@ -135,7 +128,7 @@ async function handleSubmit(e) {
         className="space-y-6"
       >
         <div className="grid gap-6 md:grid-cols-2">
-                      <FormSelect
+          <FormSelect
             label="Education Level"
             name="education_level"
             value={form.education_level}
@@ -190,7 +183,6 @@ async function handleSubmit(e) {
             placeholder="e.g. Salary, Business, Farming"
             required
           />
-
         </div>
 
         <FormInput
@@ -209,7 +201,6 @@ async function handleSubmit(e) {
           nextText={loading ? "Saving..." : "Save & Continue"}
           loading={loading}
         />
-
       </form>
     </FormCard>
   );
